@@ -4,9 +4,7 @@ import { BigNumber } from "../../api/BigNumber";
 import { theory } from "../../api/Theory";
 import { Utils, log } from "../../api/Utils";
 
-var id = "65c4462cf64dcf1a293efd1cbe50e009";
 var id = "Planetary Pendulum Periodicity";
-// var id = "Planetary Pendulum Periodicity TWO";
 var name = "Planetary Pendulum Periodicity";
 var description = "This theory explores the changing of the frequency of a pendulum upon increasing the gravity it is subjected to.";
 var authors = "Warzen User";
