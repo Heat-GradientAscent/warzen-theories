@@ -68,7 +68,7 @@ const materials = (lvl, type) => {
         {'name': 'boron', 'value': 2.34, 'form': 'B'},
         {'name': 'carbon', 'value': 2.26, 'form': 'C'},
         {'name': 'nitrogen', 'value': 1.2506, 'form': 'N'},
-        {'name': 'oxygen', 'value': 1.429, 'form': 'Ox'},
+        {'name': 'oxygen', 'value': 1.429, 'form': 'O'},
     ].sort((a, b) => a.value - b.value);
     const totalAtoms = all.length;
     if (lvl > totalAtoms) {
@@ -90,8 +90,8 @@ let M = 'M_{\\odot}';
 let G = 'G';
 let ddt = 0;
 
-var achievement1, achievement2;
-let chapter1, chapter2, chapter3, chapter4, chapter5;
+var achievement1, achievement2, achievement3, achievement4;
+let chapter1, chapter2, chapter3, chapter4, chapter5, chapter6;
 
 var init = () => {
     currency = theory.createCurrency(symbol = 'µ', latexSymbol='\\mu');
@@ -201,7 +201,7 @@ var init = () => {
     chapter5 = theory.createStoryChapter(4, 'Battling giants', 
         `You've gathered enough knowledge and a deep understanding of this project.\nYou decide to embark on a new trial to reach new heights.\n\nYou approach ${planet.name}`,
         () => SO.level > 0);
-    chapter5 = theory.createStoryChapter(5, 'Theory will only take you so far', 
+    chapter6 = theory.createStoryChapter(5, 'Theory will only take you so far', 
         `You keep pushing, there's no stopping you now.\nBut alas, technology has not advanced enough to take you outside confines of the solar system\n\n\n ...yet.`,
         () => SO.level > constants.length);
 
