@@ -1,8 +1,9 @@
-import { ExponentialCost, FirstFreeCost, LinearCost } from "../api/Costs";
+import { ExponentialCost, FirstFreeCost, FreeCost, LinearCost } from "../api/Costs";
 import { Localization } from "../api/Localization";
 import { parseBigNumber, BigNumber } from "../api/BigNumber";
 import { theory } from "../api/Theory";
 import { Utils } from "../api/Utils";
+import { ui } from "../api/ui/UI"
 
 var id = "Control System";
 var name = "Control System";
@@ -66,11 +67,11 @@ const equations = [
         'name': 'OLTF',
         'value': `
             \\begin{matrix}
-            R(s)\\;\\rightarrow \\oplus\\;\\rightarrow [\\; G_{c}(s) \\;]\\;\\rightarrow Y(s)
+            R(s)\\;\\rightarrow [\\; G_{c}(s) \\;]\\;\\rightarrow Y(s)
             \\\\\\\\
-            \\qquad \\qquad \\quad \\downarrow
+            \\qquad \\quad \\;\\; \\downarrow
             \\\\\\\\
-            \\quad\\; [\\;H(s)\\;]\\; \\leftarrow
+            \\; H(s) \\; \\leftarrow
             \\end{matrix}`
     },
     {
@@ -86,12 +87,10 @@ const equations = [
     },
 ];
 
-const lvlOneEquation = equations[0]['value'];
-
 theory.primaryEquationHeight = 120;
 theory.secondaryEquationHeight = 80;
 var getPrimaryEquation = () => {
-    return lvlOneEquation;
+    return equations[0]['value'];
 }
 
 var getSecondaryEquation = () => `
@@ -108,5 +107,47 @@ var postPublish = () => {
 }
 
 var getC1 = (level) => Utils.getStepwisePowerSum(level, 2, 10, 1);
+
+let transferFunctionClosed = false;
+let tfButton = ui.createButton({
+    text: !transferFunctionClosed ? "Open-Loop Transfer Function" : "Closed-Loop Transfer Function",
+    onClicked: () => {
+        log('changed transfer function');
+        transferFunctionClosed = !transferFunctionClosed;
+        tfButton.text = !transferFunctionClosed ? "Closed-Loop Transfer Function" : "Open-Loop Transfer Function";
+        updateAvailability();
+    },
+    row: 0,
+    column: 0,
+    isVisible: () => true,
+    horizontalOptions: LayoutOptions.START,
+});
+
+const getCurrencyBarDelegate = () => {
+
+    currencyBar = ui.createGrid({
+        columnDefinitions: ['1*', '1*', '1*',],
+        children: [
+            ui.createLatexLabel({
+                text: () => Utils.getMath(theory.tau + theory.latexSymbol),
+                row: 0,
+                column: 0,
+                horizontalTextAlignment: TextAlignment.CENTER,
+                horizontalOptions: LayoutOptions.CENTER,
+                verticalOptions: LayoutOptions.CENTER,
+            }),
+            ui.createLatexLabel({
+                text: () => Utils.getMath(currency.value.toString() + "\\rho"),
+                row: 0,
+                column: 1,
+                horizontalTextAlignment: TextAlignment.CENTER,
+                horizontalOptions: LayoutOptions.CENTER,
+                verticalOptions: LayoutOptions.CENTER,
+            }),
+            ui.createSwitch(),
+        ],
+    });
+    return currencyBar;
+}
 
 init();
