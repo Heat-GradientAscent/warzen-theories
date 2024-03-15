@@ -8,7 +8,7 @@ var id = "Planetary Pendulum Periodicity";
 var name = "Planetary Pendulum Periodicity";
 var description = "This theory explores the changing of the frequency of a pendulum upon increasing the gravity it is subjected to by throwing lots of mass together.";
 var authors = "Warzen User";
-var version = '0.2.3';
+var version = '0.2.4';
 
 var currency, currency2;
 var c1, L;
@@ -173,7 +173,7 @@ var init = () => {
             theory.invalidateSecondaryEquation();
             theory.invalidateTertiaryEquation();
         };
-        constG = 6.6743 * Math.pow(10, -11);
+        constG = BigNumber.from(6.6743 * Math.pow(10, -11));
     }
     
     /////////////////
@@ -234,7 +234,7 @@ var tick = (elapsedTime, multiplier) => {
     vol += dt * V;
     if (lastc1lvl < c1.level) {
         lastc1lvl = c1.level;
-        currency2.value = Math.max(0, currency2.value - (vol / V));
+        currency2.value = Math.max(BigNumber.ZERO, currency2.value - (vol / V));
     } else {
         currency2.value += dt * vol * bonus;
     }
@@ -260,7 +260,7 @@ var getPrimaryEquation = () => {
             {${r}} = \\frac{{3V}}{4\\pi}\\; ^ {\\frac{{1}}{3}} \\;, \\quad V = V_0 + \\sum_{n=${getMaterialForm(0)}}^{${getMaterialForm(p1.level)}} V_{n} \\;, \\quad \\dot{${M}} = c_1 \\, ^{${c1Exp.level > 0 ? 1 + c1Exp.level*.025 : ''}}
             \\\\\\\\
             \\\\\\\\
-            ${G} = 6.67430\\cdot 10^{-11} \\frac{{m^3}}{kg \\cdot s^{2}}
+            ${G} = 6.67430e-11 \\frac{{m^3}}{kg \\cdot s^{2}}
             \\end{matrix}
         `;
     } else if (stage == 1) {
@@ -288,7 +288,7 @@ var getTertiaryEquation = () => {
 
 var postPublish = () => {
     planet = constants[SO.level];
-    mass = planet.mass;
+    mass = BigNumber.from(planet.mass);
     V = BigNumber.from(mass / planet.density);
     vol = V;
     radius = R(V);
@@ -339,7 +339,7 @@ const expMantissa = (val) => {
     return { mts: mantissa, exp: expClean };
 }
 
-const R = (v) => (v/(4/3 * Math.PI)).pow(1/3);
+const R = (v) => (v/((BigNumber.FOUR/BigNumber.THREE) * BigNumber.PI)).pow(BigNumber.ONE/BigNumber.THREE);
 const Grav = (mass, rad, type='number') => {
     if (rad == 0) return type == 'number' ? 0 : '0.00';
     try {
@@ -394,7 +394,7 @@ const Frec = (gravity, type='number') => {
         return BigNumber.from((Math.pow(gravity, .5) / (BigNumber.TWO * BigNumber.PI * Math.pow(getL(L.level), .5))));
     }
 }
-let mass = planet.mass;
+let mass = BigNumber.from(planet.mass);
 let V = BigNumber.from(mass / planet.density);
 let vol = V;
 let radius = R(V);
