@@ -8,11 +8,22 @@ var id = "Planetary Pendulum Periodicity";
 var name = "Planetary Pendulum Periodicity";
 var description = "This theory explores the changing of the frequency of a pendulum upon increasing the gravity it is subjected to by throwing lots of mass together.";
 var authors = "Warzen User";
-var version = '0.2.2';
+var version = '0.2.3';
 
 var currency, currency2;
 var c1, L;
 let stage = 1;
+let p1;
+let muUpg;
+var c1Exp;
+var lastc1lvl;
+let planet, constG;
+let r = 'r_{\\odot}';
+let M = 'M_{\\odot}';
+let G = 'G';
+
+var achievement1, achievement2, achievement3, achievement4;
+let tutorial, chapter1, chapter2, chapter3, chapter4, chapter5, chapter6, chapter7;
 
 const constants = [
     {
@@ -80,18 +91,6 @@ const materials = (lvl, type) => {
     }
     return all[lvl || 0][type];
 };
-let p1;
-let muUpg;
-var c1Exp;
-var lastc1lvl;
-let planet, constG;
-let r = 'r_{\\odot}';
-let M = 'M_{\\odot}';
-let G = 'G';
-let ddt = 0;
-
-var achievement1, achievement2, achievement3, achievement4;
-let tutorial, chapter1, chapter2, chapter3, chapter4, chapter5, chapter6, chapter7;
 
 var init = () => {
     currency = theory.createCurrency(symbol = 'µ', latexSymbol='\\mu');
@@ -225,7 +224,6 @@ var tick = (elapsedTime, multiplier) => {
     theory.invalidatePrimaryEquation();
     theory.invalidateSecondaryEquation();
     theory.invalidateTertiaryEquation();
-    ddt = elapsedTime * multiplier;
     if (getC1(c1.level) == 0) return;
     
     let dt = BigNumber.from(elapsedTime * multiplier);
@@ -333,16 +331,6 @@ var goToPreviousStage = () => stage = Math.max(stage-1, 0);
 var goToNextStage = () => stage = Math.min(stage+1, 1);
 
 init();
-
-const smolNum = (a, type='str') => {
-    if (!a) return '0.00';
-    let h = Math.log10(a);
-    let j = Math.floor(h);
-    let k = Math.abs(h - j);
-    let [mts, exp] = [Math.pow(10, k).toPrecision(3), j];
-    if (type == 'num') a;
-    return `${mts}e${exp}`;
-}
 
 const expMantissa = (val) => {
     const exp = Math.log10(val);
