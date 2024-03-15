@@ -8,7 +8,7 @@ var id = "Planetary Pendulum Periodicity";
 var name = "Planetary Pendulum Periodicity";
 var description = "This theory explores the changing of the frequency of a pendulum upon increasing the gravity it is subjected to by throwing lots of mass together.";
 var authors = "Warzen User";
-var version = '0.2.0';
+var version = '0.2.1';
 
 var currency, currency2;
 var c1, L;
@@ -71,11 +71,11 @@ const materials = (lvl, type) => {
         {'name': '\\text{oxygen}', 'value': 1.429, 'form': 'O'},
     ].sort((a, b) => a.value - b.value);
     const totalAtoms = all.length;
-    if (lvl > totalAtoms) {
+    if (lvl >= totalAtoms) {
         return {
-            'name': `\\text{bigatom_{${lvl-totalAtoms}}}`,
+            'name': `\\text{bigatom_{${lvl - totalAtoms + 1}}}`,
             'value': all[totalAtoms - 1]['value'] * Math.pow(lvl/2, 1.01),
-            'form': `Ba_{${lvl-totalAtoms}}`,
+            'form': `\\beta_{${lvl - totalAtoms + 1}}`,
         }[type];
     }
     return all[lvl || 0][type];
