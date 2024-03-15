@@ -15,6 +15,7 @@ var version = '0.1.0';
 var currency;
 var c1;
 var c1Exp;
+let stage = 0;
 
 var init = () => {
     currency = theory.createCurrency();
@@ -54,6 +55,9 @@ var updateAvailability = () => {
 }
 
 var tick = (elapsedTime, multiplier) => {
+    theory.invalidatePrimaryEquation();
+    theory.invalidateSecondaryEquation();
+    theory.invalidateTertiaryEquation();
 }
 
 var getInternalState = () => ` `
@@ -90,7 +94,8 @@ const equations = [
 theory.primaryEquationHeight = 120;
 theory.secondaryEquationHeight = 80;
 var getPrimaryEquation = () => {
-    return equations[0]['value'];
+    log(stage)
+    return equations[stage]['value'];
 }
 
 var getSecondaryEquation = () => `
@@ -108,46 +113,24 @@ var postPublish = () => {
 
 var getC1 = (level) => Utils.getStepwisePowerSum(level, 2, 10, 1);
 
-let transferFunctionClosed = false;
-let tfButton = ui.createButton({
-    text: !transferFunctionClosed ? "Open-Loop Transfer Function" : "Closed-Loop Transfer Function",
-    onClicked: () => {
-        log('changed transfer function');
-        transferFunctionClosed = !transferFunctionClosed;
-        tfButton.text = !transferFunctionClosed ? "Closed-Loop Transfer Function" : "Open-Loop Transfer Function";
-        updateAvailability();
-    },
-    row: 0,
-    column: 0,
-    isVisible: () => true,
-    horizontalOptions: LayoutOptions.START,
-});
+// let transferFunctionClosed = false;
+// let tfButton = ui.createButton({
+//     text: !transferFunctionClosed ? "Open-Loop Transfer Function" : "Closed-Loop Transfer Function",
+//     onClicked: () => {
+//         log('changed transfer function');
+//         transferFunctionClosed = !transferFunctionClosed;
+//         tfButton.text = !transferFunctionClosed ? "Closed-Loop Transfer Function" : "Open-Loop Transfer Function";
+//         updateAvailability();
+//     },
+//     row: 0,
+//     column: 0,
+//     isVisible: () => true,
+//     horizontalOptions: LayoutOptions.START,
+// });
 
-const getCurrencyBarDelegate = () => {
-
-    currencyBar = ui.createGrid({
-        columnDefinitions: ['1*', '1*', '1*',],
-        children: [
-            ui.createLatexLabel({
-                text: () => Utils.getMath(theory.tau + theory.latexSymbol),
-                row: 0,
-                column: 0,
-                horizontalTextAlignment: TextAlignment.CENTER,
-                horizontalOptions: LayoutOptions.CENTER,
-                verticalOptions: LayoutOptions.CENTER,
-            }),
-            ui.createLatexLabel({
-                text: () => Utils.getMath(currency.value.toString() + "\\rho"),
-                row: 0,
-                column: 1,
-                horizontalTextAlignment: TextAlignment.CENTER,
-                horizontalOptions: LayoutOptions.CENTER,
-                verticalOptions: LayoutOptions.CENTER,
-            }),
-            ui.createSwitch(),
-        ],
-    });
-    return currencyBar;
-}
+var canGoToPreviousStage = () => stage == 1;
+var canGoToNextStage = () => stage == 0;
+var goToPreviousStage = () => stage = Math.max(stage-1, 0);
+var goToNextStage = () => stage = Math.min(stage+1, 1);
 
 init();
