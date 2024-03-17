@@ -8,7 +8,7 @@ var id = "Planetary Pendulum Periodicity";
 var name = "Planetary Pendulum Periodicity";
 var description = "This theory explores the changing of the frequency of a pendulum upon increasing the gravity it is subjected to by throwing lots of mass together.";
 var authors = "Warzen User";
-var version = '0.2.4';
+var version = '0.2.5';
 
 var currency, currency2;
 var c1, L;
@@ -173,7 +173,7 @@ var init = () => {
             theory.invalidateSecondaryEquation();
             theory.invalidateTertiaryEquation();
         };
-        constG = BigNumber.from(6.6743 * Math.pow(10, -11));
+        constG = 6.6743 * Math.pow(10, -11);
     }
     
     /////////////////
