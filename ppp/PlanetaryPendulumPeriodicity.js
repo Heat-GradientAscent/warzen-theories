@@ -105,7 +105,7 @@ var init = () => {
     
     // c1
     {
-        let getDesc = (level) => "c_1 = " + getC1(level).toString(6) + '\\, kg';
+        let getDesc = (level) => "c_1 = " + getC1(level).toString(4) + '\\, kg';
         c1 = theory.createUpgrade(0, currency2, new FirstFreeCost(new CustomCost(customC1costFn)));
         c1.maxLevel = 25000;
         c1.getDescription = (_) => Utils.getMath(getDesc(c1.level));
@@ -163,8 +163,8 @@ var init = () => {
     //dtExp
     {
         dtExp = theory.createMilestoneUpgrade(1, 5);
-        dtExp.description = Localization.getUpgradeIncCustomExpDesc(`bonus publish mult for ${currency2.symbol} `, '1');
-        dtExp.info = Localization.getUpgradeIncCustomExpInfo(`bonus publish mult for ${currency2.symbol} `, '1');
+        dtExp.description = Localization.getUpgradeIncCustomExpDesc(`${currency2.symbol} \\;\\; bonus`, '1');
+        dtExp.info = Localization.getUpgradeIncCustomExpInfo(`${currency2.symbol} \\;\\; bonus`, '1');
     }
 
     {
@@ -207,7 +207,7 @@ var init = () => {
         () => c1.level > 0);
     chapter2 = theory.createStoryChapter(2, "Take flight", 
     `The amount of mass you have gathered has begun to get in the way.\nIn fact, you can't keep it inside your office anymore,...\n\nYou need some,\nspace`,
-    () => c1.level > 20);
+    () => c1.level > 70);
     chapter3 = theory.createStoryChapter(3, 'Reminiscing ("That felt like forever")', 
         `What is that?\nIt's some sort of thing that is being...\n produced.\n\nYou can't quite name it, so you slap a label on it: ${currency.symbol}`,
         () => L.level > 0);
@@ -232,7 +232,7 @@ var updateAvailability = () => {
     SO.isAvailable = L.level > 5 || unlockedAchievements['SO'];
 }
 
-var tick = (elapsedTime, multiplier) => {    
+var tick = (elapsedTime, multiplier) => {
     SO.description = `Changes to a new celestial body.\\qquad \\qquad \\qquad \\qquad Current: ${constants[SO.level].name}`;
     if (L.level > 5) {
         unlockedAchievements['SO'] = true;
@@ -328,9 +328,13 @@ var setInternalState = (stateString) => {
     let variables = values[0].split(' ');
     let other = values[1];
     [mass, gravity, T, V, vol, radius, f] = variables.map(val => BigNumber.from(val));
-    unlockedAchievements = JSON.parse(other) ?? {
-        'SO': false,
-        'mu': false,
+    try {
+        unlockedAchievements = JSON.parse(other)
+    } catch {
+        unlockedAchievements = {
+            'SO': false,
+            'mu': false,
+        }
     };
 }
 
