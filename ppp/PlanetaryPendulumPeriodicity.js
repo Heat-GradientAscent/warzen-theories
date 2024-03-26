@@ -387,7 +387,7 @@ const Grav = (mass, rad, type='number') => {
         if (type == 'number') {
             return opmts * Math.pow(10, expo);
         } else if (type == 'string') {
-            if (-3 < expo && expo < 3) return (opmts * Math.pow(10, expo)).toFixed(2);
+            if (-3 < expo && expo < 3) return (opmts * Math.pow(10, expo)).toFixed(3);
             return `${opmts.toFixed(2)}e${expo.toFixed(0)}`;
         };
     } catch {
