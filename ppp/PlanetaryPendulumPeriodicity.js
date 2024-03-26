@@ -8,7 +8,7 @@ var id = "Planetary Pendulum Periodicity";
 var name = "Planetary Pendulum Periodicity";
 var description = "This theory explores the changing of the frequency of a pendulum upon increasing the gravity it is subjected to by throwing lots of mass together.";
 var authors = "Warzen User";
-var version = '0.3.2';
+var version = '0.3.3';
 
 var currency, currency2;
 var c1, L;
@@ -255,7 +255,7 @@ var tick = (elapsedTime, multiplier) => {
         let val = currency2.value - (vol / V);
         currency2.value = BigNumber.ZERO < val ? val : BigNumber.ZERO;
     }
-    currency2.value += dt * vol * bonus.pow(dtExp.level + 1);
+    currency2.value += vol * bonus.pow(dtExp.level + 1);
     radius = R(vol);
     gravity = Grav(mass, radius);
     if (gravity == 0) return;
@@ -263,7 +263,7 @@ var tick = (elapsedTime, multiplier) => {
     if (T == 0) return;
     
     f = Frec(gravity);
-    currency.value += dt * BigNumber.from(f * Math.pow(getL(L.level), 2 + muUpg.level / 2)) + (currency.value * getC2(c2.level) * (c2.isAvailable)) * bonus;
+    currency.value += dt * (BigNumber.from(f * Math.pow(getL(L.level), 2 + muUpg.level / 2)) + (currency.value * getC2(c2.level) * (c2.isAvailable))) * bonus;
 }
 
 theory.primaryEquationHeight = 180;
@@ -329,12 +329,12 @@ var setInternalState = (stateString) => {
     let other = values[1];
     [mass, gravity, T, V, vol, radius, f] = variables.map(val => BigNumber.from(val));
     try {
-        unlockedAchievements = JSON.parse(other)
+        unlockedAchievements = JSON.parse(other);
     } catch {
         unlockedAchievements = {
             'SO': false,
             'mu': false,
-        }
+        };
     };
 }
 
@@ -385,10 +385,9 @@ const Grav = (mass, rad, type='number') => {
         const { mts: opmts, exp: opexp } = expMantissa(operation);
         const expo = (Gexp + massexp - (2 * radexp)) + opexp;
         if (type == 'number') {
-            if (-2 < expo && expo < 2) return opmts.toFixed(2);
             return opmts * Math.pow(10, expo);
         } else if (type == 'string') {
-            if (-2 < expo && expo < 2) return opmts.toFixed(2);
+            if (-3 < expo && expo < 3) return (opmts * Math.pow(10, expo)).toFixed(3);
             return `${opmts.toFixed(2)}e${expo.toFixed(0)}`;
         };
     } catch {
@@ -405,10 +404,9 @@ const Peri = (gravity, type='number') => {
         const { mts: opmts, exp: opexp } = expMantissa(operation);
         const expo = (constantsexp + (Lexp - gravityexp)) + opexp;
         if (type == 'number') {
-            if (-2 < expo && expo < 2) return opmts.toFixed(2);
             return opmts * Math.pow(10, expo);
         } else if (type == 'string') {
-            if (-2 < expo && expo < 2) return opmts.toFixed(2);
+            if (-3 < expo && expo < 3) return (opmts * Math.pow(10, expo)).toFixed(3);
             return `${opmts.toFixed(2)}e${expo.toFixed(0)}`;
         };
     } catch {
@@ -425,10 +423,9 @@ const Frec = (gravity, type='number') => {
         const { mts: opmts, exp: opexp } = expMantissa(operation);
         const expo = (gravityexp - (Lexp + constantsexp)) + opexp;
         if (type == 'number') {
-            if (-2 < expo && expo < 2) return opmts.toFixed(2);
             return opmts * Math.pow(10, expo);
         } else if (type == 'string') {
-            if (-2 < expo && expo < 2) return opmts.toFixed(2);
+            if (-3 < expo && expo < 3) return (opmts * Math.pow(10, expo)).toFixed(3);
             return `${opmts.toFixed(2)}e${expo.toFixed(0)}`;
         };
     } catch {
