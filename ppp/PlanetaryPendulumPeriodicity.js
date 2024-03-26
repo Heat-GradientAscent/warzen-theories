@@ -1,4 +1,4 @@
-﻿import { ExponentialCost, LinearCost } from "../../api/Costs";
+﻿import { CustomCost, ExponentialCost, LinearCost } from "../../api/Costs";
 import { Localization } from "../../api/Localization";
 import { BigNumber } from "../../api/BigNumber";
 import { theory } from "../../api/Theory";
@@ -8,11 +8,26 @@ var id = "Planetary Pendulum Periodicity";
 var name = "Planetary Pendulum Periodicity";
 var description = "This theory explores the changing of the frequency of a pendulum upon increasing the gravity it is subjected to by throwing lots of mass together.";
 var authors = "Warzen User";
-var version = '0.2.0';
+var version = '0.3.3';
 
 var currency, currency2;
 var c1, L;
-let stage = 0;
+let unlockedAchievements = {
+    'SO': false,
+    'mu': false,
+};
+let stage = 1;
+let p1;
+let muUpg;
+var c1Exp;
+var lastc1lvl;
+let planet, constG;
+let r = 'r_{\\odot}';
+let M = 'M_{\\odot}';
+let G = 'G';
+
+var achievement1, achievement2, achievement3, achievement4;
+let tutorial, chapter1, chapter2, chapter3, chapter4, chapter5, chapter6, chapter7;
 
 const constants = [
     {
@@ -71,28 +86,16 @@ const materials = (lvl, type) => {
         {'name': '\\text{oxygen}', 'value': 1.429, 'form': 'O'},
     ].sort((a, b) => a.value - b.value);
     const totalAtoms = all.length;
-    if (lvl > totalAtoms) {
+    if (lvl >= totalAtoms) {
         return {
-            'name': `\\text{bigatom_{${lvl-totalAtoms}}}`,
+            'name': `\\text{bigatom_{${lvl - totalAtoms + 1}}}`,
             'value': all[totalAtoms - 1]['value'] * Math.pow(lvl/2, 1.01),
-            'form': `Ba_{${lvl-totalAtoms}}`,
+            'form': `\\beta_{${lvl - totalAtoms + 1}}`,
         }[type];
     }
     return all[lvl || 0][type];
 };
-let p1;
-let muUpg;
-var c1Exp;
-var lastc1lvl;
-let planet, constG;
-let r = 'r_{\\odot}';
-let M = 'M_{\\odot}';
-let G = 'G';
-let ddt = 0;
-
-var achievement1, achievement2, achievement3, achievement4;
-let tutorial, chapter1, chapter2, chapter3, chapter4, chapter5, chapter6, chapter7;
-
+const customC1costFn = (level, s=12) => Utils.getStepwisePowerSum(level, Math.max(1.0005, Math.log(level / BigNumber.PI)/Math.log(1.3)), s, 0);
 var init = () => {
     currency = theory.createCurrency(symbol = 'µ', latexSymbol='\\mu');
     currency2 = theory.createCurrency(symbol = 'ν', latexSymbol='\\nu');
@@ -102,8 +105,9 @@ var init = () => {
     
     // c1
     {
-        let getDesc = (level) => "c_1 = " + getC1(level).toString(2) + '\\, kg';
-        c1 = theory.createUpgrade(0, currency2, new FirstFreeCost(new ExponentialCost(1.2, 1.095)));
+        let getDesc = (level) => "c_1 = " + getC1(level).toString(4) + '\\, kg';
+        c1 = theory.createUpgrade(0, currency2, new FirstFreeCost(new CustomCost(customC1costFn)));
+        c1.maxLevel = 25000;
         c1.getDescription = (_) => Utils.getMath(getDesc(c1.level));
         c1.getInfo = (amount) => Utils.getMathTo(getDesc(c1.level), getDesc(c1.level + amount));
         lastc1lvl = c1.level;
@@ -138,9 +142,9 @@ var init = () => {
 
     /////////////////////
     // Permanent Upgrades
-    theory.createPublicationUpgrade(0, currency2, 1e20);
-    theory.createBuyAllUpgrade(1, currency, 1e3);
-    theory.createAutoBuyerUpgrade(2, currency2, 1e15);
+    theory.createPublicationUpgrade(0, currency2, 1e25);
+    theory.createBuyAllUpgrade(1, currency, 1e7);
+    theory.createAutoBuyerUpgrade(2, currency2, 1e30);
 
     ///////////////////////
     //// Milestone Upgrades
@@ -156,6 +160,13 @@ var init = () => {
         };
     }
 
+    //dtExp
+    {
+        dtExp = theory.createMilestoneUpgrade(1, 5);
+        dtExp.description = Localization.getUpgradeIncCustomExpDesc(`${currency2.symbol} \\;\\; bonus`, '1');
+        dtExp.info = Localization.getUpgradeIncCustomExpInfo(`${currency2.symbol} \\;\\; bonus`, '1');
+    }
+
     {
         muUpg = theory.createMilestoneUpgrade(2, 3);
         muUpg.description = `Make \\mu\\,\\, more efficient`;
@@ -166,7 +177,7 @@ var init = () => {
     {
         SO = theory.createMilestoneUpgrade(3, constants.length - 1);
         planet = constants[SO.level];
-        SO.description = `Changes to a new celestial body.\\qquad \\qquad \\qquad \\qquad Current: ${planet.name}`;
+        SO.description = `Changes to a new celestial body.\\qquad \\qquad \\qquad \\qquad Current: ${constants[SO.level].name}`;
         SO.info = `The starting mass and volume are greatly increased to your advantage. WARNING: BUYING OR REFUNDING RESETS PROGRESS!`;
         SO.boughtOrRefunded = (_) => {
             postPublish();
@@ -196,7 +207,7 @@ var init = () => {
         () => c1.level > 0);
     chapter2 = theory.createStoryChapter(2, "Take flight", 
     `The amount of mass you have gathered has begun to get in the way.\nIn fact, you can't keep it inside your office anymore,...\n\nYou need some,\nspace`,
-    () => c1.level > 20);
+    () => c1.level > 70);
     chapter3 = theory.createStoryChapter(3, 'Reminiscing ("That felt like forever")', 
         `What is that?\nIt's some sort of thing that is being...\n produced.\n\nYou can't quite name it, so you slap a label on it: ${currency.symbol}`,
         () => L.level > 0);
@@ -217,15 +228,20 @@ var init = () => {
 }
 
 var updateAvailability = () => {
-    muUpg.isAvailable = c1Exp.level > 1;
-    SO.isAvailable = L.level > 5;
+    muUpg.isAvailable = c1Exp.level > 1 || unlockedAchievements['mu'];
+    SO.isAvailable = L.level > 5 || unlockedAchievements['SO'];
 }
 
 var tick = (elapsedTime, multiplier) => {
+    SO.description = `Changes to a new celestial body.\\qquad \\qquad \\qquad \\qquad Current: ${constants[SO.level].name}`;
+    if (L.level > 5) {
+        unlockedAchievements['SO'] = true;
+    } else if (c1Exp.level > 1) {
+        unlockedAchievements['mu'] = true;
+    }
     theory.invalidatePrimaryEquation();
     theory.invalidateSecondaryEquation();
     theory.invalidateTertiaryEquation();
-    ddt = elapsedTime * multiplier;
     if (getC1(c1.level) == 0) return;
     
     let dt = BigNumber.from(elapsedTime * multiplier);
@@ -236,10 +252,10 @@ var tick = (elapsedTime, multiplier) => {
     vol += dt * V;
     if (lastc1lvl < c1.level) {
         lastc1lvl = c1.level;
-        currency2.value = Math.max(0, currency2.value - (vol / V));
-    } else {
-        currency2.value += dt * vol * bonus;
+        let val = currency2.value - (vol / V);
+        currency2.value = BigNumber.ZERO < val ? val : BigNumber.ZERO;
     }
+    currency2.value += vol * bonus.pow(dtExp.level + 1);
     radius = R(vol);
     gravity = Grav(mass, radius);
     if (gravity == 0) return;
@@ -247,7 +263,7 @@ var tick = (elapsedTime, multiplier) => {
     if (T == 0) return;
     
     f = Frec(gravity);
-    currency.value += dt * BigNumber.from(f * Math.pow(getL(L.level), 2 + muUpg.level / 2)) + (currency.value * getC2(c2.level) * (c2.isAvailable));
+    currency.value += dt * (BigNumber.from(f * Math.pow(getL(L.level), 2 + muUpg.level / 2)) + (currency.value * getC2(c2.level) * (c2.isAvailable))) * bonus;
 }
 
 theory.primaryEquationHeight = 180;
@@ -262,7 +278,7 @@ var getPrimaryEquation = () => {
             {${r}} = \\frac{{3V}}{4\\pi}\\; ^ {\\frac{{1}}{3}} \\;, \\quad V = V_0 + \\sum_{n=${getMaterialForm(0)}}^{${getMaterialForm(p1.level)}} V_{n} \\;, \\quad \\dot{${M}} = c_1 \\, ^{${c1Exp.level > 0 ? 1 + c1Exp.level*.025 : ''}}
             \\\\\\\\
             \\\\\\\\
-            ${G} = 6.67430\\cdot 10^{-11} \\frac{{m^3}}{kg \\cdot s^{2}}
+            ${G} = 6.67430e-11 \\frac{{m^3}}{kg \\cdot s^{2}}
             \\end{matrix}
         `;
     } else if (stage == 1) {
@@ -290,28 +306,42 @@ var getTertiaryEquation = () => {
 
 var postPublish = () => {
     planet = constants[SO.level];
-    mass = planet.mass;
+    mass = BigNumber.from(planet.mass);
     V = BigNumber.from(mass / planet.density);
     vol = V;
     radius = R(V);
     gravity = Grav(mass, radius);
     T = Peri(gravity);
     f = Frec(gravity);
+    currency.value = 0;
+    currency2.value = 0;    
+    c1.level = 0;
+    L.level = 0;
+    p1.level = 0;
+    c2.level = 0;
 }
 
-var getInternalState = () => `${mass} ${gravity} ${T} ${V} ${vol} ${radius} ${f}`;
+var getInternalState = () => `${mass} ${gravity} ${T} ${V} ${vol} ${radius} ${f}^${JSON.stringify(unlockedAchievements)}`;
 
 var setInternalState = (stateString) => {
-    let variables = stateString.split(" ");
+    let values = stateString.split('^');
+    let variables = values[0].split(' ');
+    let other = values[1];
     [mass, gravity, T, V, vol, radius, f] = variables.map(val => BigNumber.from(val));
+    try {
+        unlockedAchievements = JSON.parse(other);
+    } catch {
+        unlockedAchievements = {
+            'SO': false,
+            'mu': false,
+        };
+    };
 }
 
 var taupow = .068;
 var getPublicationMultiplier = (tau) => tau.pow(taupow);
 var getPublicationMultiplierFormula = (symbol) => `${symbol}^{${taupow}}`;
 var getTau = () => currency.value;
-let curchoose = true;
-let curuse = currency;
 var get2DGraphValue = () => {
     return currency.value.sign * (BigNumber.ONE + currency.value.abs()).log10().toNumber();
 }
@@ -320,11 +350,14 @@ var getMaterialValue = (level) => materials(level, 'value');
 var getMaterialForm = (level) => materials(level, 'form');
 
 var getL = (level) => BigNumber.from(level + 1);
-var getC1 = (level) => Utils.getStepwisePowerSum(level, Math.max(1.0005, Math.log(level / 3.1415926535898)/Math.log(1.375)), 4, 0);
-var getP1 = (level) => BigNumber.from(materials(level, 'value'));
+var getC1 = (level) => BigNumber.from(level) * customC1costFn(
+    level, s=15
+) / 10000;
+var getP1 = (level) => BigNumber.from(getMaterialValue(level));
 var getC2 = (level) => level / 800_000;
 var getLExponent = (level) => BigNumber.from(1 + 0.05 * level);
 var getC1Exponent = (level) => BigNumber.from(1 + 0.05 * level);
+var getDtExp = (level) => BigNumber.ONE + level;
 var getP1Exponent = (level) => BigNumber.from(1 + 0.05 * level);
 
 var canGoToPreviousStage = () => stage == 1;
@@ -334,16 +367,6 @@ var goToNextStage = () => stage = Math.min(stage+1, 1);
 
 init();
 
-const smolNum = (a, type='str') => {
-    if (!a) return '0.00';
-    let h = Math.log10(a);
-    let j = Math.floor(h);
-    let k = Math.abs(h - j);
-    let [mts, exp] = [Math.pow(10, k).toPrecision(3), j];
-    if (type == 'num') a;
-    return `${mts}e${exp}`;
-}
-
 const expMantissa = (val) => {
     const exp = Math.log10(val);
     const expClean = Math.floor(exp);
@@ -351,7 +374,7 @@ const expMantissa = (val) => {
     return { mts: mantissa, exp: expClean };
 }
 
-const R = (v) => (v/(4/3 * Math.PI)).pow(1/3);
+const R = (v) => (v/((BigNumber.FOUR/BigNumber.THREE) * BigNumber.PI)).pow(BigNumber.ONE/BigNumber.THREE);
 const Grav = (mass, rad, type='number') => {
     if (rad == 0) return type == 'number' ? 0 : '0.00';
     try {
@@ -364,6 +387,7 @@ const Grav = (mass, rad, type='number') => {
         if (type == 'number') {
             return opmts * Math.pow(10, expo);
         } else if (type == 'string') {
+            if (-3 < expo && expo < 3) return (opmts * Math.pow(10, expo)).toFixed(3);
             return `${opmts.toFixed(2)}e${expo.toFixed(0)}`;
         };
     } catch {
@@ -382,6 +406,7 @@ const Peri = (gravity, type='number') => {
         if (type == 'number') {
             return opmts * Math.pow(10, expo);
         } else if (type == 'string') {
+            if (-3 < expo && expo < 3) return (opmts * Math.pow(10, expo)).toFixed(3);
             return `${opmts.toFixed(2)}e${expo.toFixed(0)}`;
         };
     } catch {
@@ -400,13 +425,14 @@ const Frec = (gravity, type='number') => {
         if (type == 'number') {
             return opmts * Math.pow(10, expo);
         } else if (type == 'string') {
+            if (-3 < expo && expo < 3) return (opmts * Math.pow(10, expo)).toFixed(3);
             return `${opmts.toFixed(2)}e${expo.toFixed(0)}`;
         };
     } catch {
         return BigNumber.from((Math.pow(gravity, .5) / (BigNumber.TWO * BigNumber.PI * Math.pow(getL(L.level), .5))));
     }
 }
-let mass = planet.mass;
+let mass = BigNumber.from(planet.mass);
 let V = BigNumber.from(mass / planet.density);
 let vol = V;
 let radius = R(V);
