@@ -8,7 +8,7 @@ var id = "Planetary Pendulum Periodicity";
 var name = "Planetary Pendulum Periodicity";
 var description = "This theory explores the changing of the frequency of a pendulum upon increasing the gravity it is subjected to by throwing lots of mass together. Furthermore, it explores the relationship between an ever-increasing mass, and one of the most physics-breaking objects, black holes.";
 var authors = "Warzen User";
-var version = '0.4.0';
+var version = '0.4.1';
 
 var currency, currency2, currency3;
 var c1, L, w;
@@ -70,7 +70,7 @@ class LimitlessCustomCost {
 const constants = [
     {
         name: 'Asteroid XI',
-        mass: 0 * Math.pow(10, 1),
+        mass: 0,
         density: 10,
     },
     {
@@ -152,7 +152,7 @@ const materials = (lvl, type) => {
     }
     return all[lvl || 0][type];
 };
-const customC1costFn = (level, s=12) => Utils.getStepwisePowerSum(level, 2 + Math.pow(level, 1/(Math.log(1/(level+1))+level+1)), s, 0);
+const customC1costFn = (level, s=15) => Utils.getStepwisePowerSum(level, 1.5 + Math.pow(level, 1/(Math.log(1/(level+1))+level+1)), s, 0);
 var init = () => {
     currency = theory.createCurrency(symbol = 'µ', latexSymbol='\\mu');
     currency2 = theory.createCurrency(symbol = 'ν', latexSymbol='\\nu');
@@ -212,7 +212,7 @@ var init = () => {
 
     /////////////////////
     // Permanent Upgrades
-    theory.createPublicationUpgrade(0, currency2, 1e25);
+    theory.createPublicationUpgrade(0, currency, 1e3);
     theory.createBuyAllUpgrade(1, currency, 1e3);
     theory.createAutoBuyerUpgrade(2, currency2, 1e15);
     permup3 = theory.createPermanentUpgrade(3, currency3, new FreeCost());
@@ -235,7 +235,7 @@ var init = () => {
 
     ///////////////////////
     //// Milestone Upgrades
-    theory.setMilestoneCost(new LinearCost(2, 2.6183399));
+    theory.setMilestoneCost(new LinearCost(2, 2.11803399));
 
     // SO starting mass
     {
@@ -290,7 +290,7 @@ var init = () => {
     //// Achievements
     achievement1 = theory.createAchievement(0, "Like a swing", "Start the clock", () => c1.level > 0);
     achievement2 = theory.createSecretAchievement(1, "Time Dilation", "Going back and forth takes longer", "Make your pendulum taller?", () => L.level > 1);
-    achievement3 = theory.createAchievement(2, "Early days", "Explore other celestial bodies", () => SO.level > 1);
+    achievement3 = theory.createAchievement(2, "Early days", "Explore other celestial bodies", () => SO.level > 0);
     achievement4 = theory.createAchievement(3, "Chemist or Physicist?", "Gather heavier atoms", () => p1.level > 1);
     achievement5 = theory.createSecretAchievement(4, "They grow up so fast :')", "Enter the black hole era.", "Make it heavy!", () => radiiCompared);
     achievement6 = theory.createSecretAchievement(5, "+.1 in the Kardashev Scale", "Resetting to get more black holes.", "The Next Generation", () => rebirth.isAvailable);
@@ -361,8 +361,9 @@ var tick = (elapsedTime, multiplier) => {
     V = BigNumber.from((c / getP1(p1.level)) * nicerD) / nicerD;
     vol += BigNumber.from((dt * V) * nicerD) / nicerD;
     if (lastc1lvl < c1.level) {
+        let cost = customC1costFn(c1.level) - customC1costFn(lastc1lvl)
         lastc1lvl = c1.level;
-        let val = currency2.value - (vol / V);
+        let val = currency2.value - cost;
         currency2.value = BigNumber.ZERO < val ? val : BigNumber.ZERO;
     }
     currency2.value += vol * bonus.pow(dtExp.level * dtexpval + 1) * dt;
@@ -412,7 +413,7 @@ var getPrimaryEquation = () => {
             {f} = ${Frec(gravity, 'string') || '0.00'}Hz \\;, \\quad T = ${Peri(gravity, 'string') || '0.00'}\\,s \\;, \\quad g = ${grav || '0.00'}\\,\\frac{{m}}{s^2}
             \\\\\\\\
             \\\\\\\\
-            ${r} = ${radius.toString(3)}\\,m \\;, \\quad ${M} = ${mass.toString(3)}\\,kg
+            ${r} = ${radius.toString(radius < 100_000 ? 6 : 3)}\\,m \\;, \\quad ${M} = ${mass.toString(3)}\\,kg
             \\\\\\\\
             \\\\\\\\
             V = ${vol.toString(3)} \\,\\frac{{kg}}{m^{3}} \\;, \\quad \\dot{V}_{${getMaterialForm(p1.level)}} = \\frac{{c_1 \\, ^{${c1Exp.level > 0 ? 1 + c1Exp.level*c1expval : ''}}${permup5.level == 1 ? 'c_2' : ''}}}{${getMaterialName(p1.level,false)}} = ${V.toString(4)}\\, m^{3}
@@ -426,7 +427,7 @@ var getPrimaryEquation = () => {
             \\\\\\\\
             r_{s} = ${Schw(mass, 'string')}\\,m
             \\end{matrix}
-            `;
+        `;
     } else if (stage == 3) {
         return `
             \\begin{matrix}
@@ -558,7 +559,7 @@ var setInternalState = (stateString) => {
     };
 }
 
-var taupow = .078 * BigNumber.E;
+var taupow = .088 * BigNumber.E;
 var getPublicationMultiplier = (tau) => tau.pow(taupow / (1 + .01 * Math.log(1 + permup3.level)));
 var getPublicationMultiplierFormula = (symbol) => `${symbol}^{${taupow / (1 + .01 * Math.log(1 + permup3.level))}}`;
 var getTau = () => currency.value;
@@ -570,7 +571,7 @@ var getMaterialValue = (level) => materials(level, 'value');
 var getMaterialForm = (level) => materials(level, 'form');
 
 var getL = (level) => BigNumber.from(level + 1);
-var getC1 = (level) => (BigNumber.from(level) / 10).pow(2.1415926535898 / 2 + ((level/1000)/((level/1000) + 1)) + 1.5);
+var getC1 = (level) => Utils.getStepwisePowerSum(level, 2.61803399, 18, 0)/10_000;
 var getP1 = (level) => BigNumber.from(getMaterialValue(level));
 var getC2 = (level) => BigNumber.from(1.005).pow(level);
 var getw = (level) => BigNumber.from(1 + level * .25);
