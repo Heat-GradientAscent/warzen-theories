@@ -8,6 +8,7 @@ import { Popup } from "../api/ui/Popup";
 import { Color } from "../api/ui/properties/Color";
 import { ImageSource } from "../api/ui/properties/ImageSource";
 import { Thickness } from "../api/ui/properties/Thickness";
+import { log } from "../../api/Utils";
 
 var id = "Control System";
 var name = "Control System";
@@ -23,6 +24,7 @@ var cExp;
 let stage = 0;
 let upgrades = {}, secondEquation = '';
 let story;
+let terteq = '1';
 
 class LimitlessCustomCost {
     constructor(model) {
@@ -61,11 +63,12 @@ class LimitlessCustomCost {
 var updateUpgradesList = () => {
     c.isAvailable = false;
     c.isAvailable = true;
+    terteq = solver();
 }
 
 var recalcUpgrades = () => {
-    log('Recalcing upgrades...')
-    log(JSON.stringify(upgrades))
+    log('Recalcing upgrades...');
+    log(JSON.stringify(upgrades));
     Object.keys(upgrades).forEach((upgrade, k) => {
         let u = upgrades[upgrade];
         let i = theory.upgrades.length + 1;
@@ -82,6 +85,11 @@ var recalcUpgrades = () => {
         };
         refS.push(s);
     });
+    log('Finished recalcing upgrades.');
+}
+
+function terteqstr() {
+    return terteq;
 }
 
 var addUpgrade = (name) => {
@@ -101,7 +109,6 @@ var addUpgrade = (name) => {
     theory.upgrades.length -= 1;
 
     updateUpgradesList();
-
 }
 
 let hasLoadaded = false;
@@ -120,12 +127,10 @@ var init = () => {
         c.getInfo = (amount) => Utils.getMathTo(getDesc(c.level), getDesc(c.level + amount));
         c.boughtOrRefunded = (_) => {
             let lvl = Object.keys(upgrades).length;
-            log(lvl)
             let name = `s_{${lvl}}`;
-            upgrades[name] = {level: 0, value: 0};
+            upgrades[name] = {level: 0, value: 0, index: lvl};
             addUpgrade(name);
             lvl = Object.keys(upgrades).length;
-            log(lvl)
         }
     }
 
@@ -135,6 +140,8 @@ var init = () => {
         recalcUpgrades();
         log(theory.upgrades.length)
         secondEquation = calcSecEq();
+        
+        terteq = solver();
     }
     hasLoadaded = true;
     
@@ -243,9 +250,10 @@ var getSecondaryEquation = () => {
     return calcSecEq();
 };
 
-var getTertiaryEquation = () => `
-    \\tau = 0
-`;
+getTertiaryEquation = () => {
+    terteq = solver();
+    return terteq;
+};
 
 // var getQuaternaryEntries = () => [new QuaternaryEntry("xd_4", null)];
 
@@ -283,3 +291,314 @@ var goToPreviousStage = () => stage = Math.max(stage-1, 0);
 var goToNextStage = () => stage = Math.min(stage+1, 1);
 
 init();
+
+function print(ob) {
+    try {
+        log(JSON.stringify(ob));
+    } catch (error) {}
+} 
+
+// partial fraction decomposition & polynomial laplace solution
+// if you see this, don't ask why i don't name variables better
+
+function solver() {
+    // log('solving inverse laplace solution');
+    const copy = (ob) => JSON.parse(JSON.stringify(ob));
+    const gcd = (a, b) => !b ? a : gcd(b, a%b);
+    const char = (n) => {let str = '', q, r; while (n > 0) {q = (n-1)/26; r = (n-1)%26; n = Math.floor(q); str = String.fromCharCode(65 + r) + str}; return str};
+    function gcd(a, b) {
+        if (!b) return a;
+        return gcd(b, a % b);
+    }
+    let factors = (s, ok= false) => {
+        let result = [];
+        if (ok) print (s)
+        for (let [k, v] of Object.entries(s)) {
+            for (let i = 0; i < v; i++) {
+                result.push(k);
+            }
+        }
+        return result;
+    };
+    function polynomial(facs) {
+        let poly = [1];
+        maxf = Math.max(maxf, facs.length + 1);
+        for (let [i, fac] of facs.entries()) {
+            let old_poly = [0, ...poly];
+            poly.push(0);
+            poly = poly.map((val, idx) => val + old_poly[idx] * fac);
+        }
+        return poly;
+    }
+    let T = (A) => {
+        return A[0].map((_, c) => A.map(row => row[c]));
+    };
+    let seq = (l, e) => {
+        return l.length > 0 ? l.map((s) => s === 0 ? '(s)' : (s != 0 ? (l.length == 1 && [1, ''].includes(e) ? `s+${s}` : `(s+${s})`) : 's')).join('') : '1';
+    };
+    let seq2 = (l, e) => {
+        let len = l.length;
+        return `{${len > 0 ? l.map((s) => s === 0 ? '(s)' : (s != 0 ? (l.length == 1 && [1, ''].includes(e) ? `s+${s}` : `(s+${s})`) : 's'))[0] : '1'}}${len > 1 ? `^{${len}}` : ''}`;
+    }
+    
+    // initialize objects containing zeros and poles
+    // setup data structures
+    let s = {};
+    let slist = [];
+    let re_s = {};
+
+    Object.keys(upgrades).forEach((k) => {
+        let v = new String(upgrades[k].value);
+        slist.push(v);
+        s[v] = 0;
+        re_s[v] = 0;
+    });
+    Object.keys(upgrades).forEach((k, i) => {
+        let v = new String(upgrades[k].value);
+        s[v] += 1;
+        re_s[v] += 1;
+    });
+    // print (s);
+    // slist = Object.keys(s).reverse();
+    
+    let r = {};
+    for (const k of Object.keys(s)) {
+        r[k] = 0;
+    }
+    
+    let og_sols = {1: 0, };
+    let re_sols = copy(og_sols);
+    
+    for (let f of Object.keys(og_sols)) {
+        if (f in s) {
+            let x = og_sols[f];
+            s[f] -= x;
+            og_sols[f] -= x;
+        }
+        if (f in s && s[f] === 0) {
+            delete s[f];
+        }
+    }
+    
+    // remove repeated solutions from numerator for analyzing
+    // prepare data structure
+    let equation = {};
+    for (let h = 0; h < Object.values(s).reduce((a, b) => a + b, 0); h++) {
+        equation[char(h + 1)] = [copy(s), copy(r)];
+    }
+    
+    // do the actual removal
+    let i = 0;
+    let last_v = Infinity;
+    const facts = factors(s);
+    Object.keys(equation).forEach((f, j) => {
+        const v = facts[j];
+        i = last_v != v ? 0 : i + 1;
+        last_v = v;
+        equation[f][0][v] -= i + 1;
+        equation[f][1][v] += i + 1;
+    });
+    // print (equation);
+
+    // if anything starts to fail, uncomment this 
+    // Object.keys(equation).forEach((f, _i) => {
+    //     delete equation[f][0][undefined]
+    //     delete equation[f][1][undefined]
+    // });
+
+    // actual algorithm
+    // initial variables
+    let maxf = 0;
+    let A = [];
+
+    // calculate denominator polynomial for each fraction    
+    let sols = polynomial(factors(og_sols));
+
+    // convert denominator polynomials into matrix
+    for (let eq of Object.keys(equation)) {
+        let poly = polynomial(factors(equation[eq][0]));
+        A.push(poly);
+    }
+    // print('')
+    // print(A)
+    A.push(sols);
+    // print('start')
+    for (let i = 0; i < A.length; i++) {
+        A[i] = Array(maxf - A[i].length).fill(0).concat(A[i]);
+        // print(A[i]);
+    }
+    // print('end')
+    // print(A)
+    // print('')
+    
+    // transpose matrix for solving using Gauss-Jordan elimination
+    A = T(A);
+    // print(A)
+    
+    // gaussian elimination
+    for (let j = 0; j < A.length; j++) {
+        let index = A[j][j];
+        // if (index == 0) return '\\text{No Solution}';
+        let row = A[j].map(x => x / (index || 1));
+        A[j] = row;
+        for (let i = j + 1; i < A.length; i++) {
+            let prow = row.map(x => x * A[i][j]);
+            let rrow = A[i].map((value, k) => value - prow[k]);
+            A[i] = rrow;
+        }
+    }
+    
+    // print(A)
+    
+    // find the gcd type stuff (surprise tool that can help us later)
+    let n = A.length - 1;
+    let reducer = A[n][n];
+    if (reducer == 0) return '\\text{No Solution}';
+    A[n] = A[n].map(x => x / reducer);
+    let m = A[0].length - 1;
+    let redux = 1 / A[n][m];
+
+    // print(redux)
+
+    // reduce row echelon
+    // CANNOT READ PROPERTY '0' OF UNDEFINED tied to n amount of 0's with that A.length - n 
+    // for (let j = A.length - (slist.length || 2); j >= 0; j--) {      // MAY OR MAY NOT WORK IDEK AT THIS POINT LOL
+    for (let j = A.length - 2; j >= 0; j--) {
+        const g = A[j].slice(j + 1, -1);
+        for (let i = 0; i < g.length; i++) {
+            const _g = g[i];
+            A[j] = A[j].map((x, index) => {
+                return x - A[j + i + 1][index] * _g;
+            });
+        }
+        // A[j] = A[j];
+    }
+    // print (A);
+    // A.forEach(a => print(a));
+    // print('')
+
+    // behold, the solution vector
+    sols = T(A)[T(A).length - 1];
+    // print (sols)
+    // print (Object.keys(equation))
+
+    // return the string in the S plane and the inverse-laplace functions in the time domain
+    let teq = `\\frac{{${seq(factors(re_sols))}}}{${seq(factors(re_s))}} = `;
+    i = 0;
+    // let zip = Object.keys(equation).map((k, i) => [k, sols[i]]);
+    let eqkeys = Object.keys(equation);
+    let zip = sols.map((s, j) => [eqkeys[j], s]);
+    // zip.forEach((p) => {
+    //     print (p);
+    // });
+    // return ''
+    if (Object.entries(equation).length == 0) return '1';
+    // print (zip)
+    zip.forEach((p) => {
+        let k = p[0];
+        let v = p[1];
+        if (v === 0) return;
+        
+        let w = Math.round(Math.abs(v * redux));
+        let e = Math.round(Math.abs(redux));
+        let div = gcd(w, e);
+        
+        if (div !== 1) {
+            w /= div;
+            e /= div;
+        }
+        if (w === e) {
+            w = 1;
+            e = '';
+        }
+        // equation = {'A': [{'0':-1}, {'0': 1}]}
+        // let pol = seq2(factors(equation[k][1], true), e);
+        let pol = seq2(factors(equation[k][1]), e);
+        // print (pol);
+        if (w === 0) return;
+        if (i === 0) {
+            if (v < 0) {
+                teq += ' - ';
+            }
+            i += 1;
+        } else {
+            if (v >= 0) {
+                teq += ' + ';
+            } else {
+                teq += ' - ';
+            }
+        }
+        if (e == '1') {
+            e = '';
+        }
+        teq += `\\frac{{${w}}}{${e}${pol}}`;
+    });
+    // {}_
+    return `{}_{${teq}}\\\\\\\\`;
+}
+
+
+class iLap {
+    constructor(solution, numerator, denominator, ) {
+        let e = 1;
+    }
+}
+
+
+class OrderedObject {
+    constructor() {
+        this.keys = []; // To track insertion order of keys
+        this.values = {}; // To store key-value pairs
+    }
+
+    setK(key, value) {
+        if (!this.hasK(key)) {
+            this.keys.push(key);
+        }
+        this.values[key] = value;
+    }
+
+    getK(key) {
+        return this.values[key];
+    }
+
+    hasK(key) {
+        return this.keys.includes(key);
+    }
+
+    deleteK(key) {
+        if (this.keys.includes(key)) {
+            this.keys = this.keys.filter(k => k !== key);
+            delete this.values[key];
+            return true;
+        }
+        return false;
+    }
+
+    clearK() {
+        this.keys = [];
+        this.values = {};
+    }
+
+    keysArr() {
+        return [...this.keys];
+    }
+
+    valuesArr() {
+        return this.keys.map(key => this.values[key]);
+    }
+
+    entriesArr() {
+        return this.keys.map(key => [key, this.values[key]]);
+    }
+
+    forEachK(callback) {
+        this.keys.forEach(key => {
+            callback(this.values[key], key, this);
+        });
+    }
+
+    get size() {
+        return this.keys.length;
+    }
+}
