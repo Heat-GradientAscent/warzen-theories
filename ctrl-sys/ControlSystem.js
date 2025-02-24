@@ -25,6 +25,7 @@ let stage = 0;
 let upgrades = {}, secondEquation = '';
 let story;
 let terteq = '1';
+let canrecalc = false;
 
 class LimitlessCustomCost {
     constructor(model) {
@@ -67,6 +68,8 @@ var updateUpgradesList = () => {
 }
 
 var recalcUpgrades = () => {
+    if (!canrecalc) return;
+    canrecalc = false;
     log('Recalcing upgrades...');
     log(JSON.stringify(upgrades));
     Object.keys(upgrades).forEach((upgrade, k) => {
@@ -79,7 +82,7 @@ var recalcUpgrades = () => {
         s.getDescription = (_) => Utils.getMath(desc(s.level));
         s.getInfo = (amount) => Utils.getMathTo(desc(s.level), desc(u.level + amount));
         s.boughtOrRefunded = (_) => {
-            log(JSON.stringify(upgrades[upgrade]));
+            print (upgrades[upgrade]);
             upgrades[upgrade].level += 1;
             upgrades[upgrade].value += 1;
         };
@@ -137,7 +140,9 @@ var init = () => {
     log(theory.upgrades.length)
 
     if (!hasLoadaded) {
-        recalcUpgrades();
+        if (canrecalc) {
+            recalcUpgrades();
+        }
         log(theory.upgrades.length)
         secondEquation = calcSecEq();
         
@@ -180,10 +185,12 @@ var tick = (elapsedTime, multiplier) => {
 var getInternalState = () => `${JSON.stringify(upgrades)}`;
 
 var setInternalState = (state) => {
-    log(state)
+    print (state)
+    canrecalc = false;
     try {
-        log('loaded')
+        log('loaded');
         upgrades = JSON.parse(state);
+        canrecalc = true;
     } catch (e) {
         log('couldnt load')
         upgrades = {};
@@ -483,7 +490,9 @@ function solver() {
     // print (Object.keys(equation))
 
     // return the string in the S plane and the inverse-laplace functions in the time domain
-    let teq = `\\frac{{${seq(factors(re_sols))}}}{${seq(factors(re_s))}} = `;
+    // let teq = `\\frac{{${seq(factors(re_sols))}}}{${seq(factors(re_s))}} = `;
+    let teq = `G_c(s)=`;
+    let meq = 'g_{c}(t)=';
     i = 0;
     // let zip = Object.keys(equation).map((k, i) => [k, sols[i]]);
     let eqkeys = Object.keys(equation);
@@ -492,7 +501,12 @@ function solver() {
     //     print (p);
     // });
     // return ''
-    if (Object.entries(equation).length == 0) return '1';
+    if (Object.entries(equation).length == 0) return `
+        \\begin{matrix}
+            G_c(s)=1\\\\\\\\g_{c}(t)=\\delta(t)
+            \\\\\\\\
+        \\end{matrix}
+    `;
     // print (zip)
     zip.forEach((p) => {
         let k = p[0];
@@ -516,89 +530,93 @@ function solver() {
         let pol = seq2(factors(equation[k][1]), e);
         // print (pol);
         if (w === 0) return;
+        let sign = '';
         if (i === 0) {
             if (v < 0) {
                 teq += ' - ';
+                sign = '-';
             }
             i += 1;
         } else {
             if (v >= 0) {
                 teq += ' + ';
+                sign = '+';
             } else {
                 teq += ' - ';
+                sign = '-';
             }
         }
+        let m = new iLap(copy(equation[k][1]), w, e, sign);
+
         if (e == '1') {
             e = '';
         }
         teq += `\\frac{{${w}}}{${e}${pol}}`;
+        meq += m.show();
     });
     // {}_
-    return `{}_{${teq}}\\\\\\\\`;
+    return `
+        \\begin{matrix}
+            {${teq}}
+            \\\\\\\\
+            {${meq}}
+            \\\\\\\\
+        \\end{matrix}
+    `;
 }
 
+let facmemoized = [1, 1];
+var factorial = (a) => {
+    if (a < facmemoized.length) {
+        return facmemoized[a];
+    } else {
+        let newest = a * factorial(a - 1);
+        facmemoized[a] = newest;
+        return newest;
+    }
+};
 
 class iLap {
-    constructor(solution, numerator, denominator, ) {
-        let e = 1;
-    }
-}
-
-
-class OrderedObject {
-    constructor() {
-        this.keys = []; // To track insertion order of keys
-        this.values = {}; // To store key-value pairs
-    }
-
-    setK(key, value) {
-        if (!this.hasK(key)) {
-            this.keys.push(key);
-        }
-        this.values[key] = value;
-    }
-
-    getK(key) {
-        return this.values[key];
-    }
-
-    hasK(key) {
-        return this.keys.includes(key);
-    }
-
-    deleteK(key) {
-        if (this.keys.includes(key)) {
-            this.keys = this.keys.filter(k => k !== key);
-            delete this.values[key];
-            return true;
-        }
-        return false;
-    }
-
-    clearK() {
-        this.keys = [];
-        this.values = {};
-    }
-
-    keysArr() {
-        return [...this.keys];
-    }
-
-    valuesArr() {
-        return this.keys.map(key => this.values[key]);
-    }
-
-    entriesArr() {
-        return this.keys.map(key => [key, this.values[key]]);
-    }
-
-    forEachK(callback) {
-        this.keys.forEach(key => {
-            callback(this.values[key], key, this);
+    constructor(solution, numerator, denominator, sign) {
+        this.sol = solution;
+        Object.keys(this.sol).forEach((k) => {
+            if (this.sol[k] == 0) delete this.sol[k];
+            else this.k = k;
         });
+        this.num = numerator;
+        let fac = factorial(this.sol[this.k] - 1);
+        if (fac > 1) {
+            if (denominator == '') {
+                this.den = fac;
+            } else {
+                this.den = denominator * fac;
+            }
+        } else {
+            this.den = denominator;
+        }
+        this.sign = sign;
     }
 
-    get size() {
-        return this.keys.length;
+    show() {
+        let frac = this.num == '1' && this.den == '' ? '' : `\\frac{{${this.num}}}{${this.den || 1}}`;
+        if (this.den == '1') frac = this.num;
+        if (this.den == '1' && this.num == '1') frac = '';
+        let expsign = this.k >= 0 ? '-' : '';
+        let exp = this.k != 0 ? `${expsign}${this.k}` : '';
+        if (exp == '-1') exp = '-';
+        let exponent = this.k != 0 ? `e^{${exp}t}` : '';
+        let t;
+        if (this.sol[this.k] - 1 == 0) {
+            if (exponent == '' && frac == '') {
+                t = '1';
+            } else {
+                t = '';
+            }
+        } else {
+            let n = this.sol[this.k] - 1;
+            n = n > 1 ? n : '';
+            t = this.sol[this.k] > 0 ? `t^{${n}}` : ''; 
+        }
+        return `${this.sign}${frac}${exponent}${t}`;
     }
 }
