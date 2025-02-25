@@ -24,8 +24,18 @@ var cExp;
 let stage = 0;
 let upgrades = {}, secondEquation = '';
 let story;
-let terteq = '1';
+let terteq = '';
 let canrecalc = false;
+let laplace = []; // stores the iLap term solutions
+let t = theoryInitialTime = -10.0;
+let anyUpgradeBought = false;
+let maxUpgrades = 4;
+
+function print(ob) {
+    try {
+        log(JSON.stringify(ob));
+    } catch (error) {}
+} 
 
 class LimitlessCustomCost {
     constructor(model) {
@@ -85,7 +95,12 @@ var recalcUpgrades = () => {
             print (upgrades[upgrade]);
             upgrades[upgrade].level += 1;
             upgrades[upgrade].value += 1;
+            upgrades[upgrade].level = s.level;
+            upgrades[upgrade].value = s.level;
+            anyUpgradeBought = true;
         };
+        s.level = u.level
+        s.maxLevel = 24;
         refS.push(s);
     });
     log('Finished recalcing upgrades.');
@@ -105,10 +120,13 @@ var addUpgrade = (name) => {
     s.getDescription = (_) => Utils.getMath(desc(s.level));
     s.getInfo = (amount) => Utils.getMathTo(desc(s.level), desc(u.level + amount));
     s.boughtOrRefunded = (_) => {
-        upgrades[name].level += 1;
-        upgrades[name].value += 1;
+        upgrades[name].level = s.level;
+        upgrades[name].value = s.level;
         secondEquation = calcSecEq();
+        anyUpgradeBought = true;
     };
+    s.level = 0;
+    s.maxLevel = 24;
     theory.upgrades.length -= 1;
 
     updateUpgradesList();
@@ -134,19 +152,16 @@ var init = () => {
             upgrades[name] = {level: 0, value: 0, index: lvl};
             addUpgrade(name);
             lvl = Object.keys(upgrades).length;
+            anyUpgradeBought = true;
         }
     }
-
-    log(theory.upgrades.length)
 
     if (!hasLoadaded) {
         if (canrecalc) {
             recalcUpgrades();
         }
-        log(theory.upgrades.length)
         secondEquation = calcSecEq();
-        
-        terteq = solver();
+        anyUpgradeBought = true;
     }
     hasLoadaded = true;
     
@@ -177,25 +192,33 @@ var tick = (elapsedTime, multiplier) => {
     theory.invalidatePrimaryEquation();
     theory.invalidateSecondaryEquation();
     theory.invalidateTertiaryEquation();
+    theory.invalidateQuaternaryValues();
 
     let dt = BigNumber.from(elapsedTime * multiplier);
     let bonus = theory.publicationMultiplier;
+    if (anyUpgradeBought) {
+        terteq = solver();
+        anyUpgradeBought = false;
+    }
 }
 
-var getInternalState = () => `${JSON.stringify(upgrades)}`;
+const splitr = '|¬|';
+var getInternalState = () => `${JSON.stringify(upgrades)}${splitr}${t}`;
 
 var setInternalState = (state) => {
-    print (state)
     canrecalc = false;
     try {
-        log('loaded');
-        upgrades = JSON.parse(state);
+        [upgrades, t] = state.split(splitr).map((s) => JSON.parse(s));
+        t = BigNumber.from(t);
         canrecalc = true;
+        log('loaded');
     } catch (e) {
-        log('couldnt load')
+        log('couldnt load');
         upgrades = {};
+        t = BigNumber.from(theoryInitialTime);
     }
     recalcUpgrades();
+    anyUpgradeBought = true;
 }
 
 const equations = [
@@ -227,7 +250,7 @@ theory.primaryEquationHeight = 120;
 theory.secondaryEquationHeight = 80;
 var getPrimaryEquation = () => equations[stage]['value'];
 var calcSecEq = () => {
-    let t = '';
+    let total = '';
     let vals = {};
     Object.keys(upgrades).forEach((k, i) => {
         let v = upgrades[k].value;
@@ -240,29 +263,36 @@ var calcSecEq = () => {
     Object.keys(vals).forEach((v) => {
         let b = vals[v];
         if (v == 0) {
-            t += 's';
+            total += 's';
         } else if (v > 0) {
-            t += `(s+${v.toString(10)})`;
+            total += `(s+${v.toString(10)})`;
         } else {
-            t += `(s-${v.toString(10)})`;
+            total += `(s-${v.toString(10)})`;
         }
         if (b > 1) {
-            t += `^{${b}}`;
+            total += `^{${b}}`;
         }
     });
-    if (t == '') return 'G(s) = 1';
-    return `G_{c} = \\frac{{1}}{${t}}`;
+    if (total == '') total = '1';
+    else total = `\\frac{{1}}{${total}}`;
+    return `
+        \\begin{matrix}
+            G_{c}(s) = ${total}
+            \\\\\\\\\\\\\\\\
+        \\end{matrix}
+    `;
 }
 var getSecondaryEquation = () => {
     return calcSecEq();
 };
 
 getTertiaryEquation = () => {
-    terteq = solver();
     return terteq;
 };
 
-// var getQuaternaryEntries = () => [new QuaternaryEntry("xd_4", null)];
+var getQuaternaryEntries = () => [
+    new QuaternaryEntry("t", `${t}s`),
+];
 
 var getPublicationMultiplier = (tau) => 1;
 var getPublicationMultiplierFormula = (symbol) => `log(${symbol})`;
@@ -297,19 +327,10 @@ var canGoToNextStage = () => stage == 0;
 var goToPreviousStage = () => stage = Math.max(stage-1, 0);
 var goToNextStage = () => stage = Math.min(stage+1, 1);
 
-init();
-
-function print(ob) {
-    try {
-        log(JSON.stringify(ob));
-    } catch (error) {}
-} 
 
 // partial fraction decomposition & polynomial laplace solution
 // if you see this, don't ask why i don't name variables better
-
-function solver() {
-    // log('solving inverse laplace solution');
+var solver = () => {
     const copy = (ob) => JSON.parse(JSON.stringify(ob));
     const gcd = (a, b) => !b ? a : gcd(b, a%b);
     const char = (n) => {let str = '', q, r; while (n > 0) {q = (n-1)/26; r = (n-1)%26; n = Math.floor(q); str = String.fromCharCode(65 + r) + str}; return str};
@@ -486,11 +507,16 @@ function solver() {
 
     // behold, the solution vector
     sols = T(A)[T(A).length - 1];
-    // print (sols)
-    // print (Object.keys(equation))
+    // print ([...sols.map((v) => Math.abs(v))])
+    let resize = Math.round(1/(Math.min(...sols.map((v) => Math.abs(v))) || 1));
+    A.forEach((a) => {
+        a[A.length - 1] *= resize;
+    });
+    sols = sols.map((v) => resize * v);
+    // print (resize)
+    
 
     // return the string in the S plane and the inverse-laplace functions in the time domain
-    // let teq = `\\frac{{${seq(factors(re_sols))}}}{${seq(factors(re_s))}} = `;
     let teq = `G_c(s)=`;
     let meq = 'g_{c}(t)=';
     i = 0;
@@ -501,13 +527,19 @@ function solver() {
     //     print (p);
     // });
     // return ''
-    if (Object.entries(equation).length == 0) return `
+    if (Object.entries(equation).length == 0) {
+        laplace = [new iLap(null, 0, 0, '')];
+        return `
         \\begin{matrix}
-            G_c(s)=1\\\\\\\\g_{c}(t)=\\delta(t)
-            \\\\\\\\
+        ${teq}1
+        \\\\\\\\
+        ${meq}${laplace[0].show()}
+        \\\\\\\\
         \\end{matrix}
-    `;
+        `;
+    }
     // print (zip)
+    laplace = [];
     zip.forEach((p) => {
         let k = p[0];
         let v = p[1];
@@ -515,6 +547,8 @@ function solver() {
         
         let w = Math.round(Math.abs(v * redux));
         let e = Math.round(Math.abs(redux));
+        if (w >= e) [w, e] = [e, w];
+        // print ([resize])
         let div = gcd(w, e);
         
         if (div !== 1) {
@@ -547,6 +581,7 @@ function solver() {
             }
         }
         let m = new iLap(copy(equation[k][1]), w, e, sign);
+        laplace.push(m);
 
         if (e == '1') {
             e = '';
@@ -557,9 +592,9 @@ function solver() {
     // {}_
     return `
         \\begin{matrix}
-            {${teq}}
+            ${teq}
             \\\\\\\\
-            {${meq}}
+            ${meq}
             \\\\\\\\
         \\end{matrix}
     `;
@@ -578,6 +613,8 @@ var factorial = (a) => {
 
 class iLap {
     constructor(solution, numerator, denominator, sign) {
+        this.delta = solution == null;
+        if (this.delta) return;
         this.sol = solution;
         Object.keys(this.sol).forEach((k) => {
             if (this.sol[k] == 0) delete this.sol[k];
@@ -598,25 +635,55 @@ class iLap {
     }
 
     show() {
-        let frac = this.num == '1' && this.den == '' ? '' : `\\frac{{${this.num}}}{${this.den || 1}}`;
-        if (this.den == '1') frac = this.num;
-        if (this.den == '1' && this.num == '1') frac = '';
-        let expsign = this.k >= 0 ? '-' : '';
-        let exp = this.k != 0 ? `${expsign}${this.k}` : '';
-        if (exp == '-1') exp = '-';
-        let exponent = this.k != 0 ? `e^{${exp}t}` : '';
-        let t;
-        if (this.sol[this.k] - 1 == 0) {
-            if (exponent == '' && frac == '') {
-                t = '1';
+        if (!this.delta) {
+            let frac = this.num == '1' && this.den == '' ? '' : `\\frac{{${this.num}}}{${this.den || 1}}`;
+            if (this.den == '1') frac = this.num;
+            if (this.den == '1' && this.num == '1') frac = '';
+            let expsign = this.k >= 0 ? '-' : '';
+            let exp = this.k != 0 ? `${expsign}${this.k}` : '';
+            if (exp == '-1') exp = '-';
+            let exponent = this.k != 0 ? `e^{${exp}t}` : '';
+            let t;
+            if (this.sol[this.k] - 1 == 0) {
+                if (exponent == '' && frac == '') {
+                    t = '1';
+                } else {
+                    t = '';
+                }
             } else {
-                t = '';
+                let n = this.sol[this.k] - 1;
+                n = n > 1 ? n : '';
+                t = this.sol[this.k] > 0 ? `t^{${n}}` : ''; 
             }
+            return `${this.sign}${frac}${exponent}${t}`;
         } else {
-            let n = this.sol[this.k] - 1;
-            n = n > 1 ? n : '';
-            t = this.sol[this.k] > 0 ? `t^{${n}}` : ''; 
+            return `\\delta(t)`;
         }
-        return `${this.sign}${frac}${exponent}${t}`;
+    }
+
+    evaluate(time, dt=0) {
+        if (!this.delta) {
+            let frac = this.num == '1' && this.den == '' ? '' : `\\frac{{${this.num}}}{${this.den || 1}}`;
+            if (this.den == '1') frac = this.num;
+            if (this.den == '1' && this.num == '1') frac = '';
+            if (frac == '') frac = 1;
+            let totalValue = frac;
+            
+            let exp = 1 * this.k;
+            totalValue *= Math.pow(2.71828182845, exp);
+            
+            let n = this.sol[this.k] - 1;
+            totalValue *= Math.pow(time, n);
+            
+            return totalValue;
+        } else {
+            if ([BigNumber.ZERO].includes(BigNumber.from(time))) {
+                return Infinity;
+            } else {
+                return 0;
+            }
+        }
     }
 }
+
+init();
