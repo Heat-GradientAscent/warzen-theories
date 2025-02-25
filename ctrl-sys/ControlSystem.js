@@ -43,7 +43,7 @@ class LimitlessCustomCost {
     }
 
     cost(level) {
-        return BigNumber.ZERO; //BigNumber.from(this.model(level));
+        return BigNumber.from(this.model(level));
     }
     cumulative_cost(level, amount) {
         let result = BigNumber.ZERO;
@@ -76,25 +76,26 @@ var updateUpgradesList = () => {
     c.isAvailable = true;
     terteq = solver();
 }
+// upgrade cost model
+var upgradeCostModel = (i) => {
+    let costfunc =  new LimitlessCustomCost((level) => 100 + BigNumber.TWO.pow(Math.log2(7) * (level + i) + 1));
+    return costfunc.cost_model;
+}
 
+// recalculates old upgrades
 var recalcUpgrades = () => {
     if (!canrecalc) return;
     canrecalc = false;
     log('Recalcing upgrades...');
-    log(JSON.stringify(upgrades));
     Object.keys(upgrades).forEach((upgrade, k) => {
         let u = upgrades[upgrade];
         let i = theory.upgrades.length + 1;
-        let ccostfunc =  new LimitlessCustomCost((level) => level == 0 ? 15 : BigNumber.TWO.pow(Math.log2(2) * level));
-        let s = theory.createUpgrade(i, currency, new FirstFreeCost(ccostfunc.cost_model));
+        let s = theory.createUpgrade(i, currency, upgradeCostModel(i));
         const getValue = (level) => BigNumber.from(u.level);
         let desc = (level) => `s_{${k}}=${getValue(u.level).toString(0)}`;
         s.getDescription = (_) => Utils.getMath(desc(s.level));
         s.getInfo = (amount) => Utils.getMathTo(desc(s.level), desc(u.level + amount));
         s.boughtOrRefunded = (_) => {
-            print (upgrades[upgrade]);
-            upgrades[upgrade].level += 1;
-            upgrades[upgrade].value += 1;
             upgrades[upgrade].level = s.level;
             upgrades[upgrade].value = s.level;
             anyUpgradeBought = true;
@@ -110,11 +111,11 @@ function terteqstr() {
     return terteq;
 }
 
+// adds new upgrade
 var addUpgrade = (name) => {
     let i = theory.upgrades.length + 1;
     let u = upgrades[name];
-    let ccostfunc =  new LimitlessCustomCost((level) => level == 0 ? 15 : BigNumber.TWO.pow(Math.log2(2) * level));
-    s = theory.createUpgrade(i, currency, new FirstFreeCost(ccostfunc.cost_model));
+    let s = theory.createUpgrade(i, currency, upgradeCostModel(i));
     const getValue = (level) => BigNumber.from(u.level);
     let desc = (level) => `${name}=${getValue(u.level).toString(0)}`;
     s.getDescription = (_) => Utils.getMath(desc(s.level));
@@ -134,16 +135,17 @@ var addUpgrade = (name) => {
 
 let hasLoadaded = false;
 var init = () => {
-    currency = theory.createCurrency(symbol = 'µ', latexSymbol='\\mu');
+    currency = theory.createCurrency(symbol = 'ρ', latexSymbol='\\rho');
 
     ///////////////////
     // Regular Upgrades
 
     // c
     {
-        let ccostfunc =  new LimitlessCustomCost((level) => level == 0 ? 15 : BigNumber.TWO.pow(Math.log2(2) * level));
+        let ccostfunc =  new LimitlessCustomCost((level) => BigNumber.TEN.pow(Math.log2(29) * level));
         let getDesc = (level) => "c=" + getc(level).toString(0);
-        c = theory.createUpgrade(0, currency, new FirstFreeCost(ccostfunc.cost_model));
+        c = theory.createUpgrade(0, currency, ccostfunc.cost_model);
+        c.maxLevel = maxUpgrades;
         c.getDescription = (_) => Utils.getMath(getDesc(c.level));
         c.getInfo = (amount) => Utils.getMathTo(getDesc(c.level), getDesc(c.level + amount));
         c.boughtOrRefunded = (_) => {
@@ -168,8 +170,8 @@ var init = () => {
     /////////////////////
     // Permanent Upgrades
     theory.createPublicationUpgrade(0, currency, 1e10);
-    theory.createBuyAllUpgrade(1, currency, 1e13);
-    theory.createAutoBuyerUpgrade(2, currency, 1e30);
+    theory.createBuyAllUpgrade(1, currency, 1e10);
+    theory.createAutoBuyerUpgrade(2, currency, 1e15);
 
     ///////////////////////
     //// Milestone Upgrades
@@ -187,7 +189,8 @@ var init = () => {
 
 var updateAvailability = () => {
 }
-
+let value = 0;
+let global_dt = 0;
 var tick = (elapsedTime, multiplier) => {
     theory.invalidatePrimaryEquation();
     theory.invalidateSecondaryEquation();
@@ -195,11 +198,20 @@ var tick = (elapsedTime, multiplier) => {
     theory.invalidateQuaternaryValues();
 
     let dt = BigNumber.from(elapsedTime * multiplier);
+    global_dt = dt;
     let bonus = theory.publicationMultiplier;
     if (anyUpgradeBought) {
         terteq = solver();
         anyUpgradeBought = false;
     }
+
+    value = laplace.map((l) => l.evaluate(t, dt)).reduce((total, val) => total + val, 0) * dt;
+    if (value == Infinity) {
+        currency.value += BigNumber.ONE;
+    } else {
+        currency.value += value;
+    }
+    t += dt;
 }
 
 const splitr = '|¬|';
@@ -292,14 +304,15 @@ getTertiaryEquation = () => {
 
 var getQuaternaryEntries = () => [
     new QuaternaryEntry("t", `${t}s`),
+    new QuaternaryEntry(`d\\dot{${currency.symbol}}`, laplace[0].delta ? value : value / (global_dt || 1)),
 ];
 
 var getPublicationMultiplier = (tau) => 1;
 var getPublicationMultiplierFormula = (symbol) => `log(${symbol})`;
 var getTau = () => 0;
-var get2DGraphValue = () => (
-    BigNumber.ZERO
-).toNumber();
+var get2DGraphValue = () => {
+    return currency.value.sign * (BigNumber.ONE + currency.value.abs()).log10().toNumber();
+};
 
 var postPublish = () => {
 }
